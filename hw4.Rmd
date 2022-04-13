@@ -1,0 +1,177 @@
+---
+title: "SOC360 Homework 4: Machine learning"
+author: "Your name here"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+# Do not edit this chunk
+
+# The following lines define how the output of code chunks should behave
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(include = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(error = TRUE)
+
+# Required packages, please install any you do not have
+library(rmarkdown)
+library(tidyverse)
+library(knitr)
+library(stringr)
+library(tidytext)
+library(ggplot2)
+library(viridis)
+library(tidymodels)
+library(textrecipes)
+library(glmnet)
+
+set.seed(08901)
+```
+
+# Instructions
+
+This assignment is designed to build your familiarity with the machine techniques covered in class. As in the previous assignments, it will involve a combination of short written answers and coding in R. All answers should be written in this document. *Please write answers to written questions outside of the code cells rather than as comments.*
+
+### Requirements
+You should be viewing this document in RStudio. If you have not done so already, make sure to install the required packages (see initial chunk). You can do this by clicking the ``Install`` button in the Packages tab in the lower-right corner of RStudio and following the directions on the installation menu. You can also install packages by entering ``install.packages(x)`` into the R Console, where ``x`` is the name of the package.
+
+### Submitting the homework
+Once you have finished the assignment please complete the following steps to submit it:
+
+1. Click on the ``Knit`` menu at the top of the screen and select ``Knit to HTML``. This will execute the all of the code and render the RMarkdown document in HTML. Verify that this document contains all of your answers and that none of the chunks produce error messages.
+2. Add this document *and* the HTML file to Github. Use ``Homework submitted`` as your main commit message.
+3. Push the commit to Github.
+4. Visit the Github repository in your browser and verify that the final version of both files has been correctly uploaded.
+
+# Predicting political party from tweets
+
+## Loading the data
+We're going to be working with the Twitter politics dataset you used in the previous homework. This time you will be attempting to predict whether a tweet is written by a Democrat or a Republican.
+```{r loading data, echo=FALSE, tidy=TRUE, eval=TRUE, include=FALSE}
+data <- read_csv("data/politics_twitter.csv") %>% select(screen_name, text)
+data$party <- ifelse(data$screen_name %in% c("JoeBiden", "KamalaHarris", "SpeakerPelosi", "BernieSanders", "AOC", "SenSchumer"),
+                     "Democrat", "Republican")
+data <- data %>% 
+    mutate(text = gsub("#[A-Za-z0-9]+|@[A-Za-z0-9]", "", text)) %>% # Removing hashtags and mentions
+    mutate(text = gsub("(http[^ ]*)|(www.[^ ]*)", "", text)) %>% # Removing URLs
+    distinct(text, .keep_all =TRUE)
+```
+
+## Questions
+
+Q1. Before doing any modeling, its worth assessing whether there are any differences between the tweets by Republicans and Democrats with respect to how much they tweet. In the cell below, write a line of code to calculate the total number of tweets written by each group.
+
+```{r q1, echo=FALSE, tidy=TRUE, eval=TRUE, include=FALSE}
+
+```
+
+To make it a fair prediction task, we can take identically sized random samples from each group. Given the 50:50 class distribution, our baseline is a random guess.
+
+Run the chunk below then proceed.
+```{r sampling, echo=FALSE, tidy=TRUE, eval=TRUE, include=FALSE}
+rep.sample <- sample_n(data %>% filter(party == "Republican"), size=2000)
+dem.sample <- sample_n(data %>% filter(party == "Democrat"), size=2000)
+data <- bind_rows(rep.sample, dem.sample)
+```
+
+Q2. Now that we have our dataset, we can start to construct the modeling pipeline. The first step is to take a test-train split. Add arguments to `initial_split` to create a split where 10% of the data are held-out for testing and the classes are evenly balanced across test and training sets
+```{r q2, echo=FALSE, tidy=TRUE, eval=TRUE, include=FALSE}
+data_split <- initial_split()
+train <- training(data_split)
+test <- testing(data_split)
+```
+
+Q3. Now we want to put together a recipe. The first line specifies that we are modeling the party as a function of the text using the training data. Add the following steps from the `textrecipes` package:
+
+  - Tokenize
+  - Remove stopwords
+  - Stem
+  - Add N-grams from length 1 to 3 (you will have to use `step_untokenize` first)
+  - Filter 1000 to retain most frequent tokens
+  - Construct TF-IDF matrix
+
+You can use `prep` and `bake` to run this process and view the resulting feature matrix.
+```{r q3, echo=FALSE, tidy=TRUE, eval=TRUE, include=FALSE}
+party_recipe <- recipe(party ~ text, data  = train) %>% 
+    # Add your steps here
+
+head(prep(party_recipe, train) %>% bake(test)) ## Run to view feature matrix after preprocessing
+```
+
+Q4. Let's add a model and put together a workflow. We will use a logistic regression with a LASSO penalty. Add the recipe and the model to the workflow `wf` then answer the question below.
+```{r q4, echo=FALSE, tidy=TRUE, eval=TRUE, include=FALSE}
+lasso <- logistic_reg(penalty = 0.01, mixture = 1) %>%
+  set_mode("classification") %>%
+  set_engine("glmnet")
+
+wf <- workflow() %>% 
+  # Add your recipe and model
+```
+What is the purpose of using a workflow?
+Answer:
+
+Q5. We will use 5-fold cross-validation to evaluate performance on the training data. *Modify the `vfold_cv` function to ensure that each fold has a balanced class distribution.*
+
+Next, run the rest of the chunk to fit the model to each fold and calculate statistics. This may take a couple of minutes to run. Answer the question below.
+```{r q5, echo=TRUE, tidy=TRUE}
+folds <- vfold_cv(train, v = 5) # Add an argument
+
+fitted <- fit_resamples(
+  wf,
+  folds,
+  control = control_resamples(save_pred = TRUE),
+  metrics = metric_set(precision, recall, f_meas, roc_auc)
+)
+```
+Why do we want to stratify the balance the class distribution in each fold?
+Answer: 
+
+Q6. We can now get the predictions from the model and conduct some analyses of the results. Run these lines then answer the question below.
+```{r q6, echo=TRUE, tidy=TRUE}
+pred_probs <- collect_predictions(fitted, type = "prob")
+
+collect_metrics(fitted)
+```
+What do these metrics tell us about the performance of the classifier? Discuss each measure in turn.
+Answer:
+
+
+Q7. So far you have considered a single type of model. Let's experiment with these parameters by varying `mixture` and analyzing the results. In addition, we should vary the `penalty` parameter to find an optimal value. Specify a new model with the tunable parameters, then construct a parameter grid (see specific values in the comment below).
+
+Then run the remainder of the chunk to tune the model. This will take a few minutes since we need to fit several different models.
+```{r q7, echo=TRUE, tidy=TRUE}
+l2 <- # Specify the logistic regression with tunable parameters
+
+# penalty can range from 0.001 to 1, mixture from 0 to 1. 
+# Test four different values in each range for each parameter
+param_grid <- 
+
+wf <- wf %>% update_model(l2)
+
+fitted.2 <- tune_grid(
+  wf,
+  folds,
+  grid = param_grid,
+  metrics = metric_set(precision, recall, f_meas, roc_auc),
+  control = control_resamples(save_pred = TRUE)
+)
+
+pred_probs.2 <- collect_predictions(fitted.2, type = "prob")
+```
+
+
+Q8. We can plot the results to assess how the different hyperparameters affect performance. Run the chunk and answer the questions below.
+```{r q10, echo=TRUE, tidy=TRUE}
+autoplot(fitted.3) + 
+  labs(title = "Model performance across regularization strength and type",
+  color = "mixture") + scale_color_viridis_d()
+```
+Analyze the graph above and describe the effects of varying the penalty and mixture. 
+Answer:
+
+Q9. Discuss the overall results. Is this task more or less difficult than you expected? Are there factors that might make it difficult to predict political affiliation from tweets?
+
+*This is the end of the assignment. Please submit it following the instructions at the beginning of this document.*
