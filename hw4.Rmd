@@ -38,14 +38,6 @@ This assignment is designed to build your familiarity with the machine technique
 ### Requirements
 You should be viewing this document in RStudio. If you have not done so already, make sure to install the required packages (see initial chunk). You can do this by clicking the ``Install`` button in the Packages tab in the lower-right corner of RStudio and following the directions on the installation menu. You can also install packages by entering ``install.packages(x)`` into the R Console, where ``x`` is the name of the package.
 
-### Submitting the homework
-Once you have finished the assignment please complete the following steps to submit it:
-
-1. Click on the ``Knit`` menu at the top of the screen and select ``Knit to HTML``. This will execute the all of the code and render the RMarkdown document in HTML. Verify that this document contains all of your answers and that none of the chunks produce error messages.
-2. Add this document *and* the HTML file to Github. Use ``Homework submitted`` as your main commit message.
-3. Push the commit to Github.
-4. Visit the Github repository in your browser and verify that the final version of both files has been correctly uploaded.
-
 # Predicting political party from tweets
 
 ## Loading the data
@@ -77,20 +69,19 @@ dem.sample <- sample_n(data %>% filter(party == "Democrat"), size=2000)
 data <- bind_rows(rep.sample, dem.sample)
 ```
 
-Q2. Now that we have our dataset, we can start to construct the modeling pipeline. The first step is to take a test-train split. Add arguments to `initial_split` to create a split where 10% of the data are held-out for testing and the classes are evenly balanced across test and training sets
+Q2. Now that we have our dataset, we can start to construct the modeling pipeline. The first step is to take a test-train split. Add arguments to `initial_split` to create a split where 20% of the data are held-out for testing and the classes are evenly balanced across test and training sets
 ```{r q2, echo=FALSE, tidy=TRUE, eval=TRUE, include=FALSE}
 data_split <- initial_split()
 train <- training(data_split)
 test <- testing(data_split)
 ```
 
-Q3. Now we want to put together a recipe. The first line specifies that we are modeling the party as a function of the text using the training data. Add the following steps from the `textrecipes` package:
+Q3. Now we want to put together a recipe. The first line specifies that we are modeling the party as a function of the text using the training data. Add the following steps from the `textrecipes` package (in order):
 
   - Tokenize
   - Remove stopwords
-  - Stem
   - Add N-grams from length 1 to 3 (you will have to use `step_untokenize` first)
-  - Filter 1000 to retain most frequent tokens
+  - Filter to retain the 1000 most frequent n-grams
   - Construct TF-IDF matrix
 
 You can use `prep` and `bake` to run this process and view the resulting feature matrix.
@@ -117,7 +108,7 @@ Q5. We will use 5-fold cross-validation to evaluate performance on the training 
 
 Next, run the rest of the chunk to fit the model to each fold and calculate statistics. This may take a couple of minutes to run. Answer the question below.
 ```{r q5, echo=TRUE, tidy=TRUE}
-folds <- vfold_cv(train, v = 5) # Add an argument
+folds <- vfold_cv(train, v = 5) # Add an argument for balance
 
 fitted <- fit_resamples(
   wf,
@@ -131,47 +122,107 @@ Answer:
 
 Q6. We can now get the predictions from the model and conduct some analyses of the results. Run these lines then answer the question below.
 ```{r q6, echo=TRUE, tidy=TRUE}
-pred_probs <- collect_predictions(fitted, type = "prob")
-
 collect_metrics(fitted)
 ```
-What do these metrics tell us about the performance of the classifier? Discuss each measure in turn.
+Interpret the precision and recall metrics.
 Answer:
 
 
-Q7. So far you have considered a single type of model. Let's experiment with these parameters by varying `mixture` and analyzing the results. In addition, we should vary the `penalty` parameter to find an optimal value. Specify a new model with the tunable parameters, then construct a parameter grid (see specific values in the comment below).
+Q7. So far you have considered a single type of model. Let's try to perform this classification using a simple single-layer neural network from the `keras` package. The documentation for `parsnip` (part of `tidymodels`) explains how to implement a neural network using the `mlp` function: https://parsnip.tidymodels.org/reference/mlp.html
 
-Then run the remainder of the chunk to tune the model. This will take a few minutes since we need to fit several different models.
-```{r q7, echo=TRUE, tidy=TRUE}
-l2 <- # Specify the logistic regression with tunable parameters
+Complete the code below to specify the model and parameter grid. The model should have the following components: the number of hidden units and dropout should be tunable, each with two levels. For the number of units, test three different values between 10 and 100. For dropout, evaluate models with values of 0 and 0.05. The training epochs should be fixed to 100. No additional arguments need to be specified.
 
-# penalty can range from 0.001 to 1, mixture from 0 to 1. 
-# Test four different values in each range for each parameter
-param_grid <- 
+Once you have completed the code, answer the questions below then execute the chunk afterwards to run the models.
+```{r q7a, echo=TRUE, tidy=TRUE}
+# install.packages("keras") # Uncomment and run to install keras. Remove before knitting final submission
+library(keras)
 
-wf <- wf %>% update_model(l2)
+# Specify the arguments to the `mlp` function to set model parameters
+neural_network <- mlp() %>%
+  set_mode("classification") %>%
+  set_engine("keras") 
 
-fitted.2 <- tune_grid(
+# Specify a parameter grid
+param_grid <- grid_regular(
+  # Add parameter and range
+  # Add parameter and range
+  # Specify parameter levels
+)
+
+print(param_grid)
+```
+What is the purpose of the dropout parameter?
+Answer:
+
+In total, how many combinations of parameters are being analyzed?
+Answer:
+
+Taking the cross-validation into account, how many models will be estimated in this process?
+Answer:
+
+Run the chunk below to add the model to the work flow and execute the code. As the code runs, you will see that R prints out the loss score at each epoch, representing how the model is fitting the data. It will also make a series of plots. You should see that the loss decreases over time, indicating that the model is learning to predict the outcome more accurately, although it can also fluctuate up and down as the model tests different weights.
+
+This code will take around 10-15 minutes to run since we need to fit several different models, so you might want to go for a walk or make a coffee. Note that it will also take a while to knit the document when you generate the final version since this process will be repeated.
+```{r q7b, echo=TRUE, tidy=TRUE}
+wf <- wf %>% update_model(neural_network)
+
+gridsearch <- tune_grid(
   wf,
   folds,
   grid = param_grid,
   metrics = metric_set(precision, recall, f_meas, roc_auc),
   control = control_resamples(save_pred = TRUE)
 )
-
-pred_probs.2 <- collect_predictions(fitted.2, type = "prob")
 ```
-
 
 Q8. We can plot the results to assess how the different hyperparameters affect performance. Run the chunk and answer the questions below.
-```{r q10, echo=TRUE, tidy=TRUE}
-autoplot(fitted.3) + 
+```{r q8, echo=TRUE, tidy=TRUE}
+autoplot(gridsearch) + 
   labs(title = "Model performance across regularization strength and type",
-  color = "mixture") + scale_color_viridis_d()
+  color = "dropout") + scale_color_viridis_d() + theme_classic()
 ```
-Analyze the graph above and describe the effects of varying the penalty and mixture. 
+Analyze the graph above and describe the effects of varying the two parameters. Is there an optimal combination of parameters? Are there any trade-offs?
 Answer:
 
-Q9. Discuss the overall results. Is this task more or less difficult than you expected? Are there factors that might make it difficult to predict political affiliation from tweets?
+Q9.  Use `select_best()` to find the best performing model according to the ROC-AUC measure. Next, filter the results from `collect_metrics` to show the results for the best model. The table should have four rows. Inspect the F1, precision, and recall then answer the question below.
+```{r q9, echo=TRUE, tidy=TRUE}
+best_params <- #
+collect_metrics(gridsearch) %>%
+```
+How does the model perform on each of the four metrics compared to the logistic regression used above (output from Q6)? Does it perform better or worse overall?
+Answer: 
 
-*This is the end of the assignment. Please submit it following the instructions at the beginning of this document.*
+Q10. Run the code below to take the best parameters and estimate a final model. Proceed to the next chunk once the code has finished.
+```{r q10a, echo=TRUE, tidy=TRUE}
+final_wf <- finalize_workflow(wf, best_params)
+final_model <- last_fit(final_wf, data_split)
+```
+
+Execute this chunk to calculate the performance of the model on the out-of-sample test data then answer the questions below.
+```{r q10b, echo=TRUE, tidy=TRUE}
+final.precision <- collect_predictions(final_model) %>% precision(truth=party, estimate = .pred_class)
+final.recall <- collect_predictions(final_model) %>% recall(truth=party, estimate = .pred_class)
+final.f1 <- collect_predictions(final_model) %>% f_meas(truth=party, estimate = .pred_class)
+print(bind_rows(final.precision, final.recall, final.f1))
+```
+Does the model perform better or worse on the test data compared with the training data?
+Answer:
+
+Do these results imply that the model has underfit or overfit the training data?
+Answer:
+
+Is this task more or less difficult than you expected? Are there factors that might make it difficult to predict political affiliation from tweets?
+Answer:
+
+*This is the end of the assignment. Please submit it following the instructions below.*
+
+### AI usage
+Please use this space to document any usage of AI tools (e.g. ChatGPT) during this assignment:
+
+### Submitting the homework
+Once you have finished the assignment please complete the following steps to submit it:
+
+1. Click on the ``Knit`` menu at the top of the screen and select ``Knit to HTML``. This will execute the all of the code and render the RMarkdown document in HTML. Verify that this document contains all of your answers and that none of the chunks produce error messages. It will take a while to knit since the models must be reestimated.
+2. Add this document *and* the HTML file to Github. Use ``Homework submitted`` as your main commit message.
+3. Push the commit to Github.
+4. Visit the Github repository in your browser and verify that the final version of both files has been correctly uploaded.
