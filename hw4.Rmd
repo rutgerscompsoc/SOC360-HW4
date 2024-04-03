@@ -2,8 +2,8 @@
 title: "SOC360 Homework 4: Machine learning"
 author: "Your name here"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -28,7 +28,7 @@ library(tidymodels)
 library(textrecipes)
 library(glmnet)
 
-set.seed(08901)
+set.seed(148508901)
 ```
 
 # Instructions
@@ -54,15 +54,12 @@ data <- data %>%
 
 ## Questions
 
-Q1. Before doing any modeling, its worth assessing whether there are any differences between the tweets by Republicans and Democrats with respect to how much they tweet. In the cell below, write a line of code to calculate the total number of tweets written by each group.
-
+Q1. Before doing any modeling, exanube whether there are any differences between the tweets by Republicans and Democrats with respect to how much they tweet. In the cell below, write a line of code to calculate the total number of tweets written by each group.
 ```{r q1, echo=FALSE, tidy=TRUE, eval=TRUE, include=FALSE}
 
 ```
 
-To make it a fair prediction task, we can take identically sized random samples from each group. Given the 50:50 class distribution, our baseline is a random guess.
-
-Run the chunk below then proceed.
+To make it a fair prediction task, we can take identically sized random samples from each group. Given the 50:50 class distribution, our baseline is a random guess. Run the chunk below then proceed.
 ```{r sampling, echo=FALSE, tidy=TRUE, eval=TRUE, include=FALSE}
 rep.sample <- sample_n(data %>% filter(party == "Republican"), size=2000)
 dem.sample <- sample_n(data %>% filter(party == "Democrat"), size=2000)
@@ -80,7 +77,7 @@ Q3. Now we want to put together a recipe. The first line specifies that we are m
 
   - Tokenize
   - Remove stopwords
-  - Add N-grams from length 1 to 3 (you will have to use `step_untokenize` first)
+  - Add N-grams from length 1 to 3 (Hint: You will have to use `step_untokenize` first)
   - Filter to retain the 1000 most frequent n-grams
   - Construct TF-IDF matrix
 
@@ -89,11 +86,13 @@ You can use `prep` and `bake` to run this process and view the resulting feature
 party_recipe <- recipe(party ~ text, data  = train) %>% 
     # Add your steps here
 
-head(prep(party_recipe, train) %>% bake(test)) ## Run to view feature matrix after preprocessing
+# Prints feature matrix example (do not modify)
+head(prep(party_recipe, train) %>% bake(test))
 ```
 
 Q4. Let's add a model and put together a workflow. We will use a logistic regression with a LASSO penalty. Add the recipe and the model to the workflow `wf` then answer the question below.
 ```{r q4, echo=FALSE, tidy=TRUE, eval=TRUE, include=FALSE}
+# Do not modify the model
 lasso <- logistic_reg(penalty = 0.01, mixture = 1) %>%
   set_mode("classification") %>%
   set_engine("glmnet")
@@ -104,12 +103,13 @@ wf <- workflow() %>%
 What is the purpose of using a workflow?
 Answer:
 
-Q5. We will use 5-fold cross-validation to evaluate performance on the training data. *Modify the `vfold_cv` function to ensure that each fold has a balanced class distribution.*
+Q5. We will use 5-fold cross-validation to evaluate performance on the training data. Modify the `vfold_cv` function to ensure that each fold has a balanced class distribution.
 
-Next, run the rest of the chunk to fit the model to each fold and calculate statistics. This may take a couple of minutes to run. Answer the question below.
+Next, run the rest of the chunk to fit the model to each fold and calculate statistics. This may take a couple of minutes to complete. Answer the question below.
 ```{r q5, echo=TRUE, tidy=TRUE}
 folds <- vfold_cv(train, v = 5) # Add an argument for balance
 
+# Do not modify code below
 fitted <- fit_resamples(
   wf,
   folds,
@@ -128,9 +128,15 @@ Interpret the precision and recall metrics.
 Answer:
 
 
-Q7. So far you have considered a single type of model. Let's try to perform this classification using a simple single-layer neural network from the `keras` package. The documentation for `parsnip` (part of `tidymodels`) explains how to implement a neural network using the `mlp` function: https://parsnip.tidymodels.org/reference/mlp.html
+Q7. Let's try to perform the classification using an alternative model. Specifically, using a single-layer neural network from the `keras` package. The documentation for `parsnip` (part of `tidymodels`) explains how to implement a neural network using the `mlp` function: https://parsnip.tidymodels.org/reference/mlp.html
 
-Complete the code below to specify the model and parameter grid. The model should have the following components: the number of hidden units and dropout should be tunable, each with two levels. For the number of units, test three different values between 10 and 100. For dropout, evaluate models with values of 0 and 0.05. The training epochs should be fixed to 100. No additional arguments need to be specified.
+Complete the code below to specify the model and parameter grid. The model should have the following components: 
+
+    - The number of hidden units and dropout should be tunable, each with two levels. 
+    - For the number of hidden units, test three different values between 10 and 100. 
+    - For dropout, evaluate models with values of 0 and 0.05. 
+    - The training epochs should be fixed to 75. 
+    - No additional arguments need to be specified.
 
 Once you have completed the code, answer the questions below then execute the chunk afterwards to run the models.
 ```{r q7a, echo=TRUE, tidy=TRUE}
@@ -154,6 +160,9 @@ print(param_grid)
 What is the purpose of the dropout parameter?
 Answer:
 
+What is an epoch?
+Answer:
+
 In total, how many combinations of parameters are being analyzed?
 Answer:
 
@@ -164,6 +173,7 @@ Run the chunk below to add the model to the work flow and execute the code. As t
 
 This code will take around 10-15 minutes to run since we need to fit several different models, so you might want to go for a walk or make a coffee. Note that it will also take a while to knit the document when you generate the final version since this process will be repeated.
 ```{r q7b, echo=TRUE, tidy=TRUE}
+# Do not modify
 wf <- wf %>% update_model(neural_network)
 
 gridsearch <- tune_grid(
@@ -175,8 +185,10 @@ gridsearch <- tune_grid(
 )
 ```
 
-Q8. We can plot the results to assess how the different hyperparameters affect performance. Run the chunk and answer the questions below.
+
+Q8. This plot shows how the different hyperparameter combinations affect performance. Run the chunk and answer the questions below.
 ```{r q8, echo=TRUE, tidy=TRUE}
+# Do not modify
 autoplot(gridsearch) + 
   labs(title = "Model performance across regularization strength and type",
   color = "dropout") + scale_color_viridis_d() + theme_classic()
@@ -187,19 +199,21 @@ Answer:
 Q9.  Use `select_best()` to find the best performing model according to the ROC-AUC measure. Next, filter the results from `collect_metrics` to show the results for the best model. The table should have four rows. Inspect the F1, precision, and recall then answer the question below.
 ```{r q9, echo=TRUE, tidy=TRUE}
 best_params <- #
-collect_metrics(gridsearch) %>%
+collect_metrics(gridsearch) %>% # Complete the pipe
 ```
 How does the model perform on each of the four metrics compared to the logistic regression used above (output from Q6)? Does it perform better or worse overall?
 Answer: 
 
 Q10. Run the code below to take the best parameters and estimate a final model. Proceed to the next chunk once the code has finished.
 ```{r q10a, echo=TRUE, tidy=TRUE}
+# Do not modify
 final_wf <- finalize_workflow(wf, best_params)
 final_model <- last_fit(final_wf, data_split)
 ```
 
 Execute this chunk to calculate the performance of the model on the out-of-sample test data then answer the questions below.
 ```{r q10b, echo=TRUE, tidy=TRUE}
+# Do not modify
 final.precision <- collect_predictions(final_model) %>% precision(truth=party, estimate = .pred_class)
 final.recall <- collect_predictions(final_model) %>% recall(truth=party, estimate = .pred_class)
 final.f1 <- collect_predictions(final_model) %>% f_meas(truth=party, estimate = .pred_class)
