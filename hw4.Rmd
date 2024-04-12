@@ -141,6 +141,7 @@ Complete the code below to specify the model and parameter grid. The model shoul
 Once you have completed the code, answer the questions below then execute the chunk afterwards to run the models.
 ```{r q7a, echo=TRUE, tidy=TRUE}
 # install.packages("keras") # Uncomment and run to install keras. Remove before knitting final submission
+# Note: `keras` does not work for some users. Try `brulee` instead. Replace package name below and in `set_engine` call. The first time `brulee` is loaded respond "Yes" to the question in the console to download package files.
 library(keras)
 
 # Specify the arguments to the `mlp` function to set model parameters
